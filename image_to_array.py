@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-class Image_To_ArrayRGB():
+class Image_To_Array:
     """
     A utility class that converts an image into an array of RGB values.
     
@@ -12,14 +12,22 @@ class Image_To_ArrayRGB():
     pixel, ordered from top-left to bottom-right pixel.
     """
     
-    def __init__(self, filepath):
+    def __init__(self, filepath, colour_space = "RGB"):
         """
-        Initialize the Image_To_ArrayRGB object.
+        Initialize the Image_To_Array object.
 
         Parameters
         ----------
         filepath : str
             Path to the image file to be loaded.
+        color_space : str
+            Color space to convert to. 
+            Options include:
+                'RGB' - Red, Green, Blue (default)
+                'LAB' - Lightness, A*, B* (perceptually uniform)
+                'HSV' - Hue, Saturation, Value  
+                'XYZ' - CIE XYZ color space
+                'LUV' - CIE LUV color space
             
         Attributes
         ----------
@@ -120,7 +128,7 @@ if __name__ == "__main__":
     plt.show()
     
     #Create image to array object
-    a = Image_To_ArrayRGB(image_path3)
+    a = Image_To_Array(image_path3)
     
     #Print properties of object and show image
     print(a.rgb_array)

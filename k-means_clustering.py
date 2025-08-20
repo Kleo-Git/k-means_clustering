@@ -1,9 +1,10 @@
-from image_to_array import Image_To_ArrayRGB
+from image_to_array import Image_To_Array
 import colorsys
 import numpy as np
 import random as rd
 import cv2
 import matplotlib.pyplot as plt
+import time
 
 class KMeans_Image:
     
@@ -31,11 +32,12 @@ class KMeans_Image:
         self.k = k
         
         #Create inital centroid values
-        self.centroids = self.initalize_centroids()
+        self.inital_centroids = self.__initalize_centroids()[0]
+        self.inital_centroids_indicies = self.__initalize_centroids()[1]
         
         self.colours = []
         
-    def calculate_distance(position1, position2):
+    def calculate_distance(self, position1, position2):
         """
         Compute the Eucledian distance between 2 points in n-dimensional space.
 
@@ -61,7 +63,7 @@ class KMeans_Image:
         #Return distance
         return distance
     
-    def initalize_centroids(self):
+    def __initalize_centroids(self):
         """
         Randomly selects k unique centroids from the flattened input array
 
@@ -78,7 +80,9 @@ class KMeans_Image:
         
         #Store a list of values that have already been chosen as a centroid
         #Prevents picking the same pixel for multiple centroids
+        #Picked indicies will be used for visualisation
         picked_values = []
+        picked_indices = []
         
         #If k is larger then number of pixels would cause an infinite loop
         if self.k > num_pixels:
@@ -96,42 +100,143 @@ class KMeans_Image:
             pixel = rd.randint(0,num_pixels-1)
             
             #Prevent allowing for repeated pixels for a given centroid
-            if pixel not in picked_values:
-                picked_values.append(pixel)
+            if pixel not in picked_indices:
+                picked_indices.append(pixel)
+                picked_values.append(self.input_array[pixel])
                 counter+=1
                 
-        #Return the selected centroids, list that should have length k
-        return picked_values
+        #Return the selected centroids, and their indicies for colouring the image
+        return picked_values, picked_indices
             
-    def k_means(self):
-        
-        print("Centroids = ", self.centroids)
-        
-        #fig = plt.figure()
-        #ax = fig.add_subplot(projection='3d')
-        
+    def assign_to_centroids(self, centroids):
+        """
+        Assign each pixel in the input array to the nearest centroid based on 
+        Euclidean distance in RGB space.
+
+        Parameters
+        ----------
+        centroids : list of list[float]
+            List of current centroid coordinates, where each centroid is [R,G,B].
+
+        Returns
+        -------
+        assignments : list
+            List of [pixel, assigned_centroid_index] pairs, where "pixel" is the original
+            pixel value and "assigned_centroid_index" is the index of the nearest centroid.
+
+        """
+
         #Empty list that will be in the form of [[R,G,B], "Associated Centroid"]
-        new_list = []
+        assignments = []
         
-        for i in range(len(self.input_array)):
+        #Iterate through every pixel in the input array
+        for pixel in self.input_array:
             shortest_distance = float("inf")
             associated_centroid = 0
             
-            for centroid in self.centroids:
-                
-                current_distance = self.calculate_distance(self.input_array[i], self.input_array[centroid])
-                
+            #Compare the pixel to each centroid
+            for i, centroid in enumerate(centroids):
+
+                current_distance = self.calculate_distance(pixel, centroid)
+
+                #Update the nearest centroid if the new distance is smaller                
                 if current_distance < shortest_distance:
                     shortest_distance = current_distance
-                    associated_centroid = centroid
-                
-            new_list.append([self.input_array[i], associated_centroid])
+                    associated_centroid = i
             
-        self.colour_centroids(a.image, self.centroids)
+            #Record the pixel and its nearest centroid
+            assignments.append([pixel, associated_centroid])
         
-        return new_list
+        return assignments
     
-    def colour_centroids(self, saturation = 0.8, value = 0.9):
+    def update_centroids(self, assignment_list, current_centroids):
+        """
+        Compute the new centroid positions as the mean of all pixels
+        assigned to the given centroid.
+
+        Parameters
+        ----------
+        assignment_list : list
+            List of [pixel, assigned_centroid_index] pairs from "assign_to_centroids".
+        current_centroids : list of list[float]
+            Current centroid coordinates.
+
+        Returns
+        -------
+        new_centroids : list of list[float]
+            Updated centroid coordinates based on mean of assigned pixels.
+            If a centroid has no assigned pixels, it retains its previous position.
+
+        """
+        #Create dictionary to group pixels by their assigned centroid index
+        centroid_groups = {i: [] for i in range(self.k)}
+    
+        #Create the groups
+        for pixel, assigned_index in assignment_list:
+            centroid_groups[assigned_index].append(pixel)
+        
+        #Compute new centroids
+        new_centroids = []
+        for i in range(self.k):
+            group = np.array(centroid_groups[i])
+            if len(group) == 0:
+                #If no pixels assigned, keep current centroid
+                new_centroids.append(current_centroids[i])
+            else:
+                #Compute mean across all assigned pixels
+                new_centroids.append(group.mean(axis=0))
+
+        return new_centroids
+            
+    def kmeans_loop(self, max_iterations = 100, tolerance=1e-4, display_interval = 1):
+        """
+        Perform K-means clustering algortihm on the input array.
+
+        Parameters
+        ----------
+        max_iterations : int, optional
+            Maximum number of iterations to run.
+            Default is 100.
+        tolerance : float, optional
+            Threshold for minimum centroid movement to determine convergence.
+            Default is 1e-4.
+        display_interval : int, optional
+            Number of iterations between visual outputs of centriod assignments.
+            Default is 1.
+
+        Returns
+        -------
+        centroids : list of list[float]
+            Final centroid positions after convergence (or max iterations).
+        assignments : list
+            Final assignments of each pixel to a centroid.
+        centroid_indices : list
+            Initial indicies of centroids.
+        """
+        #Initialize centroids
+        centroids, centroid_indices = self.__initalize_centroids()
+        
+        for i in range(max_iterations):
+            #Assign each pixel to nearest centroid
+            assignments = self.assign_to_centroids(centroids)
+            
+            #Compute new centroids
+            new_centroids = self.update_centroids(assignments, centroids)
+            
+            #Display the clustering progress
+            if i % display_interval == 0:
+                self.colour_centroids(assignments)
+            
+            #Check if centroids have converged
+            if np.allclose(new_centroids, centroids, atol=tolerance):
+                print(f"Convergence reach after {i} iterations")
+                break
+            
+            centroids = new_centroids
+        
+        return centroids, assignments, centroid_indices
+    
+    def colour_centroids(self, assignments, saturation = 0.8, value = 0.9):
         """
         Colour the centroid pixels of the image for visualization.
         
@@ -159,16 +264,12 @@ class KMeans_Image:
         colours = self.colour_map(saturation, value)
         
         #Make a copy of image so original is not modified.
-        temp_image = self.image.copy()
+        temp_image = self.image.copy().reshape(-1, 3)
         
-        for i, centroid in enumerate(self.centroids):
-            #Find corresponding pixel positions for recolouring.
-            x = (centroid) // self.image.shape[0]
-            y = (centroid) % self.image.shape[1]
-            
-            #Assign the colour to the centroid pixel.
-            temp_image[x][y] = colours[i]
-        
+        for i, (_, centroid_idx) in enumerate(assignments):
+            temp_image[i] = colours[centroid_idx]
+           
+        temp_image = temp_image.reshape(self.image.shape)
         #Display recoloured image.
         plt.imshow(temp_image)
         plt.show()
@@ -212,11 +313,8 @@ class KMeans_Image:
             
         return colours_corrected
 
-a = Image_To_ArrayRGB("images/test_image4.jpg")
-b = KMeans_Image(a, 3)
-b.colour_centroids()
-
-
-
-
+a = Image_To_Array("images/lion_test.jpg")
+b = KMeans_Image(a, 4)  
+b.kmeans_loop()
+a.show_image()
 
