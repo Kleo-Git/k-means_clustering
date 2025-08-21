@@ -1,5 +1,4 @@
 import cv2 as cv
-import numpy as np
 import matplotlib.pyplot as plt
 
 
@@ -101,9 +100,9 @@ class Image_To_Array:
 if __name__ == "__main__":
     
     #File paths for test images
-    image_path = "test_image.jpg"
-    image_path2 = "test_image2.jpg"
-    image_path3 = "test_image3.jpg"
+    image_path = "images/test_image.jpg"
+    image_path2 = "images/test_image2.jpg"
+    image_path3 = "images/test_image3.jpg"
     
     
     #Reading image paths, and finding pixel values

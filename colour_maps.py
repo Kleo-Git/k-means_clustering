@@ -1,0 +1,238 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import colorsys
+
+class Colour_Map_Object():
+    
+    main_colours = {
+        "black" : [0,0,0],
+        "white" : [255,255,255],
+        "red" : [255,0,0],
+        "lime" : [0,255,0],
+        "blue" : [0,0,255],
+        "yellow" : [255,255,0],
+        "cyan" : [0,255,255],
+        "magenta" : [255,0,255],
+        "pink" : [255,192,203],
+        "silver" : [192,192,192],
+        "grey" : [128,128,128],
+        "maroon" : [128,0,0],
+        "olive" : [128,128,0],
+        "green" : [0,128,0],
+        "purple" : [128,0,128],
+        "teal" : [0,128,128],
+        "navy" : [0,0,128],
+        "orange" : [255,165,0]
+        } 
+    
+    default_gradients = {
+        "jkr" : [main_colours["black"], main_colours["white"]],
+        "mjz" : [main_colours["black"], main_colours["yellow"], main_colours["red"]],
+        "exo" : [main_colours["magenta"], main_colours["lime"], main_colours["cyan"], main_colours["red"]],
+        "snw" : [main_colours["navy"], main_colours["teal"], main_colours["cyan"], main_colours["white"]],
+        "ply1" : [main_colours["black"], main_colours["yellow"], main_colours["white"]],
+        "kia" : [main_colours["teal"], main_colours["white"], main_colours["pink"]],
+        "rgb": [main_colours["red"], main_colours["lime"], main_colours["blue"]],
+        "fire": [main_colours["red"], main_colours["yellow"]],
+        "sunlight" : [main_colours["orange"], main_colours["yellow"], main_colours["white"]],
+        "ocean" : [main_colours["navy"], main_colours["blue"], main_colours["cyan"]]
+        }
+    
+    def __init__(self):
+        """
+        Initialize Colour_Map_Object instance.
+        
+        Attributes
+        ----------
+        main_colours : list
+            A copy of the class-level "main_colours" list.
+            This ensures instance-level modifications don't affect
+            class level defaults.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.main_colours = self.__class__.main_colours.copy()
+        
+    def colour_gradient(self, selected_colours, detail=200):
+        """
+        Generate a smooth gradient between a set of colours.
+
+        Parameters
+        ----------
+        selected_colours : list of list[int] or str
+            -If a list : Each element should be an RGB triplet in
+            the range [0,255]. Atleast two colours are required.
+            -If a string : Treated as a key into "self.default_gradients" for 
+            preset gradients.
+        detail : int, optional
+            The total number of interpolation steps across the gradient.
+            Higher values will give a smoother gradient.
+            default = 200
+
+        Raises
+        ------
+        ValueError
+            If a string is entered and not found in "self.default_gradients".
+
+        Returns
+        -------
+        gradient : ndarray of shape(1, width, 3)
+            A NumPy array representing the gradient in normalized RGB values
+            [0,1]. Can be directly visualized with "plot_gradient".
+
+        """
+        
+        #Search if string is within default gradients
+        if isinstance(selected_colours, str):
+            if selected_colours not in self.default_gradients:
+                raise ValueError(f"Unknown gradient preset '{selected_colours}'. "
+                                 f"Available presets: {list(self.default_gradients.keys())}")
+            #Select colours found in default gradients
+            selected_colours = self.default_gradients[selected_colours]
+            
+        #Find number of colours
+        num_colours = len(selected_colours)
+        #Make sure atleast 2 colours are chosen to create a gradient
+        #Note that if the same colour is added twice, can generate a solid block of colour
+        if num_colours <= 1:
+            print("Need atleast 2 colours to make a gradient!")
+            return
+        
+        #Divide total detail evenly across number of colours
+        detail = detail // num_colours
+        
+        gradient=[]
+        #Interpolate between each pair of consecutive colours
+        for i in range(num_colours-1):
+            gradient.append(np.linspace(selected_colours[i], selected_colours[i+1], detail)/255)
+        
+        #Reshape into (1,width,3) for compatability with imshow.
+        gradient = np.reshape(gradient, [1,detail*(num_colours-1),3])     
+        
+        return gradient
+    
+    def gradient_colour_map(self, num_colours, selected_colours, detail=200):
+        """
+        Generate a discrete set of colours sampled from a smooth gradient.
+
+        Parameters
+        ----------
+        num_colours : int
+            The number of colours to sample from the gradient.
+        selected_colours : list of list[int] or str
+            - If list : Each element should be an RGB triplet in [0,255]
+            - If string : Treated as key into "self.default_gradients"
+              for preset gradients.
+        detail : int, optional
+            Resolution of underlying gradient from which colours are sampled.
+            Higher values produce smoother colour transitions.
+            default = 200.
+
+        Returns
+        -------
+        colours : list of list[float]
+            A list of RGB colours (each as a list of floats in [0,255])
+            sampled evenly across the gradient.
+
+        """
+        
+        #Intialize a gradient based on selected colours
+        col_gradient = self.colour_gradient(selected_colours, detail)
+        
+        colours=[]
+        
+        grad_len = col_gradient.shape[1]
+        
+        #Select evenly spaced indicies along the gradient
+        colour_idxs = np.linspace(0, grad_len-1, num=num_colours, dtype=int)
+        
+        #Convert normalized [0,1] RGB values back to [0,255]
+        for idx in colour_idxs:
+            colours.append((255*col_gradient[0, idx]).tolist())
+        
+        return colours
+        
+    def hsv_colour_map(self, num_colours, saturation = 0.8, value = 0.9, hue_offset=0.0):
+        """
+        Generates a list of distinct RGB colours.
+        
+        Colours are created by evenly spacing hues around the HSV colour wheel
+        while using the specified saturation and value. The HSV values are converted
+        to RGB and scaled to 0-255.
+        
+
+        Parameters
+        ----------
+        saturation : float, optional
+            Saturation of the HSV colour (0 to 1). Higher values produce more vivid colours.
+            default = 0.8
+        value : float, optional
+            Value/brightness of the HSV colour (0 to 1). Higher values produce brighter colours.
+            default = 0.9
+        hue_offset : float, optional
+            Allows the ability to change the inital colour offset so different sets of
+            colours can be chosen.
+            default = 0.0
+
+        Returns
+        -------
+        colours_corrected : list of list[int]
+            List of RGB colours for each centroid, where each colour is [R,G,B] with 
+            values scaled to 0-255 as intergers.
+
+        """
+    
+        colours=[]
+        
+        #Generates HSV colours evenly spaced by hue.
+        for i in range(num_colours):
+            hue = ((i / num_colours) + hue_offset) % 1.0
+            colours.append(list(colorsys.hsv_to_rgb(hue, saturation, value)))
+    
+        colours_corrected = []
+        
+        #Convert to 0-255 RGB intergers
+        for i in range(len(colours)):
+            colours_corrected.append([int(j * 255) for j in colours[i]])
+            
+        return colours_corrected
+    
+    def plot_gradient(self, gradient):
+        """
+        Displays an image of a gradient map.
+        
+        This function visualizes the given gradient array (generated from
+        "colour_gradient"), using matplotlib's "imshow", which renders the
+        data as a colour image.
+        
+        Parameters
+        ----------
+        gradient : array of shape (1, width, 3)
+            A 3D array representing the gradient values to be displayed.
+        """
+        plt.imshow(gradient, aspect='auto', interpolation='nearest')
+        plt.show()
+    
+    
+if __name__ == "__main__":
+    
+    gradient = Colour_Map_Object()
+    
+    g = gradient.colour_gradient([gradient.main_colours["white"], gradient.main_colours["lime"], gradient.main_colours["green"], gradient.main_colours["black"]], 500)
+    
+    gradient.plot_gradient(g)
+    
+        
+        
+        
+    
+    
+    
+    
+    
+    
+    
+    

@@ -1,14 +1,13 @@
 from image_to_array import Image_To_Array
+from colour_maps import Colour_Map_Object
 import colorsys
 import numpy as np
 import random as rd
-import cv2
 import matplotlib.pyplot as plt
-import time
 
 class KMeans_Image:
     
-    def __init__(self, image_object, k):
+    def __init__(self, image_object, k, colours=None):
         """
         Intialize KMeans_Image object
 
@@ -32,10 +31,14 @@ class KMeans_Image:
         self.k = k
         
         #Create inital centroid values
-        self.inital_centroids = self.__initalize_centroids()[0]
-        self.inital_centroids_indicies = self.__initalize_centroids()[1]
+        centroids, indicies = self.__initalize_centroids()
+        self.initial_centroids = centroids
+        self.initial_centroids_indicies = indicies
         
-        self.colours = []
+        self.colours = colours
+        
+        if self.colours == None:
+            self.colours = Colour_Map_Object().hsv_colour_map(self.k)
         
     def calculate_distance(self, position1, position2):
         """
@@ -236,22 +239,13 @@ class KMeans_Image:
         
         return centroids, assignments, centroid_indices
     
-    def colour_centroids(self, assignments, saturation = 0.8, value = 0.9):
+    def colour_centroids(self, assignments):
         """
         Colour the centroid pixels of the image for visualization.
         
         Each centroid in self.centroids is assinged a distinct colour
-        generated from HSV colour space. The colours are displayed on a 
+        generated from HSV colour space by default. The colours are displayed on a 
         copy of the image to avoid modifying values of the original.
-
-        Parameters
-        ----------
-        saturation : float, optional
-            Saturation of the HSV colour (0 to 1). Higher values produce more vivid colours.
-            Default is 0.8.
-        value : float, optional
-            Value/brightness of the HSV colour (0 to 1). Higher values produce brighter colours.
-            The default is 0.9.
 
         Returns
         -------
@@ -261,60 +255,26 @@ class KMeans_Image:
         """
         
         #Generate distinct colours for each centroid.
-        colours = self.colour_map(saturation, value)
+        #colours = self.colour_map(saturation, value)
         
         #Make a copy of image so original is not modified.
         temp_image = self.image.copy().reshape(-1, 3)
         
         for i, (_, centroid_idx) in enumerate(assignments):
-            temp_image[i] = colours[centroid_idx]
+            temp_image[i] = self.colours[centroid_idx]
            
         temp_image = temp_image.reshape(self.image.shape)
         #Display recoloured image.
         plt.imshow(temp_image)
         plt.show()
         
-    def colour_map(self, saturation, value):
-        """
-        Generates a list of distinct RGB colours.
-        
-        Colours are created by evenly spacing hues around the HSV colour wheel
-        while using the specified saturation and value. The HSV values are converted
-        to RGB and scaled to 0-255.
-        
-
-        Parameters
-        ----------
-        saturation : float
-            Saturation of the HSV colour (0 to 1). Higher values produce more vivid colours.
-        value : float
-            Value/brightness of the HSV colour (0 to 1). Higher values produce brighter colours.
-
-        Returns
-        -------
-        colours_corrected : list of list[int]
-            List of RGB colours for each centroid, where each colour is [R,G,B] with 
-            values scaled to 0-255 as intergers.
-
-        """
     
-        colours=[]
-        
-        #Generates HSV colours evenly spaced by hue.
-        for i in range(self.k):
-            hue = i / self.k
-            colours.append(list(colorsys.hsv_to_rgb(hue, saturation, value)))
-    
-        colours_corrected = []
-        
-        #Convert to 0-255 RGB intergers
-        for i in range(len(colours)):
-            colours_corrected.append([int(j * 255) for j in colours[i]])
-            
-        return colours_corrected
 
 a = Image_To_Array("images/lion_test.jpg")
-b = KMeans_Image(a, 4)  
-b.kmeans_loop()
+colour_object = Colour_Map_Object()
+k=6
+colours=colour_object.gradient_colour_map(k, "ply1")
+b = KMeans_Image(a, k, colours)  
+b.kmeans_loop(max_iterations=100)
 a.show_image()
 
