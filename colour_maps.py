@@ -30,13 +30,15 @@ class Colour_Map_Object():
         "mjz" : [main_colours["black"], main_colours["yellow"], main_colours["red"]],
         "exo" : [main_colours["magenta"], main_colours["lime"], main_colours["cyan"], main_colours["red"]],
         "snw" : [main_colours["navy"], main_colours["teal"], main_colours["cyan"], main_colours["white"]],
-        "ply1" : [main_colours["black"], main_colours["yellow"], main_colours["white"]],
+        "torq" : [main_colours["black"], main_colours["white"], main_colours["yellow"]],
         "kia" : [main_colours["teal"], main_colours["white"], main_colours["pink"]],
         "rgb": [main_colours["red"], main_colours["lime"], main_colours["blue"]],
         "fire": [main_colours["red"], main_colours["yellow"]],
         "sunlight" : [main_colours["orange"], main_colours["yellow"], main_colours["white"]],
-        "ocean" : [main_colours["navy"], main_colours["blue"], main_colours["cyan"]]
-        }
+        "ocean" : [main_colours["navy"], main_colours["blue"], main_colours["cyan"]],
+        "void" : [main_colours["black"], main_colours["purple"], main_colours["black"]],
+        "deep_sea" : [main_colours["black"], main_colours["navy"], main_colours["black"]]
+        } 
     
     def __init__(self):
         """
@@ -221,7 +223,7 @@ if __name__ == "__main__":
     
     gradient = Colour_Map_Object()
     
-    g = gradient.colour_gradient([gradient.main_colours["white"], gradient.main_colours["lime"], gradient.main_colours["green"], gradient.main_colours["black"]], 500)
+    g = gradient.colour_gradient("mjz", 1000)
     
     gradient.plot_gradient(g)
     

@@ -1,13 +1,14 @@
 from image_to_array import Image_To_Array
 from colour_maps import Colour_Map_Object
-import colorsys
+from skimage import color
+import cv2 as cv
 import numpy as np
 import random as rd
 import matplotlib.pyplot as plt
 
 class KMeans_Image:
     
-    def __init__(self, image_object, k, colours=None):
+    def __init__(self, image_object, k, colours=None, colour_space=None):
         """
         Intialize KMeans_Image object
 
@@ -25,20 +26,102 @@ class KMeans_Image:
 
         """
         self.image_object = image_object
-        self.input_array = image_object.rgb_array
+        
+        self.input_array = image_object.colour_array
+        self.rgb_array = image_object.rgb_array
+        
         self.image = image_object.image
-        self.image.shape = image_object.image_shape
+        self.image_shape = image_object.image_shape
+        
         self.k = k
         
-        #Create inital centroid values
-        centroids, indicies = self.__initalize_centroids()
-        self.initial_centroids = centroids
-        self.initial_centroids_indicies = indicies
+        self.colour_space = image_object.colour_space
         
+        self.final_centroids = None
+        self.final_assignments = None
+        
+        #Colours used for visualization
         self.colours = colours
         
         if self.colours == None:
             self.colours = Colour_Map_Object().hsv_colour_map(self.k)
+            
+    def __convert_colour_space(self, rgb_array):
+        """
+        Convert RGB array to specified colour space
+        """
+        rgb_normalized = np.array(rgb_array) / 255
+        
+        if self.colour_space == "RGB":
+            return rgb_normalized*255
+        
+        elif self.colour_space == "LAB":
+            lab = color.rgb2lab(rgb_normalized.reshape(-1,1,3)).reshape(-1,3)
+            return lab
+            
+        elif self.colour_space == "HSV":
+            hsv = color.rgb2hsv(rgb_normalized.reshape(-1,1,3)).reshape(-1,3)
+            hsv[:, 0] *= 360
+            hsv[:, 1:] *= 100
+            return hsv
+        
+        elif self.colour_space == "XYZ":
+            xyz = color.rgb2xyz(rgb_normalized.reshape(-1,1,3)).reshape(-1,3)
+            return xyz
+        
+        elif self.colour_space == "LUV":
+            luv = color.rgb2luv(rgb_normalized.reshape(-1,1,3)).reshape(-1,3)
+            return luv
+        
+        else:
+            raise ValueError(f"Unrecognised colour space : {self.colour_space}")
+            
+    def __convert_back_to_rgb(self, colour_values):
+        """
+        Convert color values back to RGB for display
+        
+        Parameters
+        ----------
+        color_values : numpy array
+            Values in the current color space
+            
+        Returns
+        -------
+        rgb_values : numpy array
+            RGB values (0-255)
+        """
+        
+        colour_values = np.array(colour_values)
+        
+        if self.colour_space == "RGB":
+            return np.clip(colour_values, 0, 255).astype(int)
+        
+        elif self.colour_space == "LAB":
+            # Convert LAB back to RGB
+            lab_normalized = colour_values.reshape(-1, 1, 3)
+            rgb = color.lab2rgb(lab_normalized).reshape(-1, 3)
+            return np.clip(rgb * 255, 0, 255).astype(int)
+        
+        elif self.colour_space == "HSV":
+            # Convert HSV back to RGB using OpenCV format
+            hsv_img = colour_values.reshape(1, -1, 3).astype(np.uint8)
+            rgb_img = cv.cvtColor(hsv_img, cv.COLOR_HSV2RGB)
+            return rgb_img.reshape(-1, 3)
+        
+        elif self.colour_space == "XYZ":
+            # Convert XYZ back to RGB
+            xyz_normalized = (colour_values / 100).reshape(-1, 1, 3)
+            rgb = color.xyz2rgb(xyz_normalized).reshape(-1, 3)
+            return np.clip(rgb * 255, 0, 255).astype(int)
+        
+        elif self.colour_space == "LUV":
+            # Convert LUV back to RGB
+            luv_normalized = colour_values.reshape(-1, 1, 3)
+            rgb = color.luv2rgb(luv_normalized).reshape(-1, 3)
+            return np.clip(rgb * 255, 0, 255).astype(int)
+        
+        else:
+            raise ValueError(f"Unsupported color space: {self.colour_space}")
         
     def calculate_distance(self, position1, position2):
         """
@@ -187,11 +270,11 @@ class KMeans_Image:
                 new_centroids.append(current_centroids[i])
             else:
                 #Compute mean across all assigned pixels
-                new_centroids.append(group.mean(axis=0))
+                new_centroids.append(group.mean(axis=0).tolist())
 
         return new_centroids
             
-    def kmeans_loop(self, max_iterations = 100, tolerance=1e-4, display_interval = 1):
+    def kmeans_loop(self, max_iterations = 10, tolerance=1e-3, display_interval = 1):
         """
         Perform K-means clustering algortihm on the input array.
 
@@ -199,10 +282,10 @@ class KMeans_Image:
         ----------
         max_iterations : int, optional
             Maximum number of iterations to run.
-            Default is 100.
+            Default is 10.
         tolerance : float, optional
             Threshold for minimum centroid movement to determine convergence.
-            Default is 1e-4.
+            Default is 1e-3.
         display_interval : int, optional
             Number of iterations between visual outputs of centriod assignments.
             Default is 1.
@@ -216,6 +299,9 @@ class KMeans_Image:
         centroid_indices : list
             Initial indicies of centroids.
         """
+        
+        print(f"Starting k-means clustering in {self.colour_space} color space...")
+        
         #Initialize centroids
         centroids, centroid_indices = self.__initalize_centroids()
         
@@ -228,7 +314,7 @@ class KMeans_Image:
             
             #Display the clustering progress
             if i % display_interval == 0:
-                self.colour_centroids(assignments)
+                self.visualize_clustering(assignments, centroids)
             
             #Check if centroids have converged
             if np.allclose(new_centroids, centroids, atol=tolerance):
@@ -236,10 +322,15 @@ class KMeans_Image:
                 break
             
             centroids = new_centroids
+        else:
+            print(f"Reached maximum iterations ({max_iterations})")
+        
+        self.final_centroids = centroids
+        self.final_assignments = assignments
         
         return centroids, assignments, centroid_indices
     
-    def colour_centroids(self, assignments):
+    def visualize_clustering(self, assignments, current_centroids):
         """
         Colour the centroid pixels of the image for visualization.
         
@@ -256,25 +347,127 @@ class KMeans_Image:
         
         #Generate distinct colours for each centroid.
         #colours = self.colour_map(saturation, value)
+        rgb_centroids = self.__convert_back_to_rgb(np.array(current_centroids))
         
         #Make a copy of image so original is not modified.
-        temp_image = self.image.copy().reshape(-1, 3)
+        #temp_image = self.image.copy().reshape(-1, 3)
+        temp_image = np.zeros((len(assignments), 3), dtype=np.uint8)
         
         for i, (_, centroid_idx) in enumerate(assignments):
-            temp_image[i] = self.colours[centroid_idx]
+            temp_image[i] = rgb_centroids[centroid_idx]
            
         temp_image = temp_image.reshape(self.image.shape)
         #Display recoloured image.
+        #plt.imshow(temp_image)
+        #plt.show()
+        
+        # Display the image
+        plt.figure(figsize=(10, 5))
+        
+        # Show original
+        plt.subplot(1, 2, 1)
+        plt.imshow(self.image_object.rgb_image)
+        plt.title('Original Image')
+        plt.axis('off')
+        
+        # Show clustered
+        plt.subplot(1, 2, 2)
         plt.imshow(temp_image)
+        plt.title(f'K-Means Clustering (k={self.k}, {self.colour_space})')
+        plt.axis('off')
+        
+        plt.tight_layout()
         plt.show()
         
+    def visualize_with_gradient_colors(self):
+        """
+        Visualize the final clustering result using the custom gradient colors.
+        
+        Returns
+        -------
+        None.
+            Displayes the image with centroid pixels coloured using matplotlib.
+
+        
+        """
+        if self.final_centroids is None or self.final_assignments is None:
+            print("No clustering results available. Run kmeans_loop() first.")
+            return
+        
+        # Create output image using gradient colors
+        clustered_image = np.zeros((len(self.final_assignments), 3), dtype=np.uint8)
+        
+        # Assign each pixel the gradient color of its centroid
+        for i, (_, centroid_idx) in enumerate(self.final_assignments):
+            clustered_image[i] = self.colours[centroid_idx]
+           
+        # Reshape back to original image dimensions
+        clustered_image = clustered_image.reshape(self.image_shape)
+        
+        # Display comparison
+        plt.figure(figsize=(10, 5))
+        
+        # Show original
+        plt.subplot(1, 3, 1)
+        plt.imshow(self.image_object.rgb_image)
+        plt.title('Original Image')
+        plt.axis('off')
+        
+        # Show clustered with actual centroid colors
+        rgb_centroids = self.__convert_back_to_rgb(np.array(self.final_centroids))
+        actual_clustered = np.zeros((len(self.final_assignments), 3), dtype=np.uint8)
+        for i, (_, centroid_idx) in enumerate(self.final_assignments):
+            actual_clustered[i] = rgb_centroids[centroid_idx]
+        actual_clustered = actual_clustered.reshape(self.image_shape)
+
+        # Show clustered with gradient colors
+        plt.subplot(1, 3, 2)
+        plt.imshow(clustered_image)
+        plt.title('Custom Gradient Colors')
+        plt.axis('off')
+        
+        plt.tight_layout()
+        plt.show()
+    
+    def get_dominant_colors(self):
+        """
+        Get the dominant colors from clustering results
+        
+        Returns
+        -------
+        colors_rgb : list
+            List of dominant colors in RGB format
+        percentages : list  
+            Percentage of image each color represents
+        """
+        if self.final_centroids is None or self.final_assignments is None:
+            print("No clustering results available. Run kmeans_loop() first.")
+            return None, None
+        
+        # Count pixels per cluster
+        cluster_counts = {}
+        for _, centroid_idx in self.final_assignments:
+            cluster_counts[centroid_idx] = cluster_counts.get(centroid_idx, 0) + 1
+        
+        # Convert centroids to RGB
+        colors_rgb = self._convert_back_to_rgb(self.final_centroids)
+        
+        # Calculate percentages
+        total_pixels = len(self.final_assignments)
+        percentages = [(cluster_counts.get(i, 0) / total_pixels) * 100 
+                      for i in range(self.k)]
+        
+        return colors_rgb.tolist(), percentages
     
 
-a = Image_To_Array("images/lion_test.jpg")
-colour_object = Colour_Map_Object()
-k=6
-colours=colour_object.gradient_colour_map(k, "ply1")
-b = KMeans_Image(a, k, colours)  
-b.kmeans_loop(max_iterations=100)
-a.show_image()
+    
+
+if __name__ == "__main__":
+    k=6
+    image_rgb = Image_To_Array("images/sunset2.jpg", "RGB")
+    colour_object = Colour_Map_Object()
+    colours=colour_object.gradient_colour_map(k, "void")
+    kmeans_rgb = KMeans_Image(image_rgb, k, colours)
+    kmeans_rgb.kmeans_loop(max_iterations=10, display_interval=9)
+    kmeans_rgb.visualize_with_gradient_colors()
 
