@@ -450,7 +450,7 @@ class KMeans_Image:
             cluster_counts[centroid_idx] = cluster_counts.get(centroid_idx, 0) + 1
         
         # Convert centroids to RGB
-        colors_rgb = self._convert_back_to_rgb(self.final_centroids)
+        colors_rgb = self.__convert_back_to_rgb(self.final_centroids)
         
         # Calculate percentages
         total_pixels = len(self.final_assignments)
@@ -463,11 +463,11 @@ class KMeans_Image:
     
 
 if __name__ == "__main__":
-    k=6
+    k=4
     image_rgb = Image_To_Array("images/sunset2.jpg", "RGB")
     colour_object = Colour_Map_Object()
     colours=colour_object.gradient_colour_map(k, "void")
     kmeans_rgb = KMeans_Image(image_rgb, k, colours)
     kmeans_rgb.kmeans_loop(max_iterations=10, display_interval=9)
-    kmeans_rgb.visualize_with_gradient_colors()
+    print(kmeans_rgb.get_dominant_colors())
 
