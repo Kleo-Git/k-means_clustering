@@ -5,10 +5,11 @@ import cv2 as cv
 import numpy as np
 import random as rd
 import matplotlib.pyplot as plt
+import time
 
 class KMeans_Image:
     
-    def __init__(self, image_object, k=None, colours=None, colour_space=None, ignore_background = False, background_threshold = 10):
+    def __init__(self, image_object, k=None, colours=None, colour_space=None, ignore_background = False, background_threshold = 10, messages=False):
         """
         Intialize KMeans_Image object
 
@@ -42,9 +43,12 @@ class KMeans_Image:
         self.ignore_background = ignore_background
         self.background_threshold = background_threshold
         
+        self.messages = messages
+        
         if self.ignore_background:
             self.__setup_filtered_arrays()
-            print(f"Using {len(self.input_array)} foreground pixels out of {len(self.original_input_array)} total")
+            if self.messages:
+                print(f"Using {len(self.input_array)} foreground pixels out of {len(self.original_input_array)} total")
         else:
             self.input_array = self.original_input_array
             self.rgb_array = self.original_rgb_array
@@ -241,27 +245,19 @@ class KMeans_Image:
 
         """
 
-        #Empty list that will be in the form of [[R,G,B], "Associated Centroid"]
-        assignments = []
-        
-        #Iterate through every pixel in the input array
-        for pixel in self.input_array:
-            shortest_distance = float("inf")
-            associated_centroid = 0
-            
-            #Compare the pixel to each centroid
-            for i, centroid in enumerate(centroids):
-
-                current_distance = self.calculate_distance(pixel, centroid)
-
-                #Update the nearest centroid if the new distance is smaller                
-                if current_distance < shortest_distance:
-                    shortest_distance = current_distance
-                    associated_centroid = i
-            
-            #Record the pixel and its nearest centroid
-            assignments.append([pixel, associated_centroid])
-        
+        #Convert to NumPy arrays
+        pixels = np.asarray(self.input_array)
+        centroids = np.asarray(centroids)
+    
+        # Compute distances using NumPy
+        distances = np.linalg.norm(pixels[:, None, :] - centroids[None, :, :], axis=2)
+    
+        # Pick nearest centroid index for each pixel
+        nearest = np.argmin(distances, axis=1)
+    
+        #Recreate original structure of assignments
+        assignments = [[pixel.tolist(), idx] for pixel, idx in zip(pixels, nearest)]
+    
         return assignments
     
     def update_centroids(self, assignment_list, current_centroids):
@@ -303,7 +299,7 @@ class KMeans_Image:
 
         return new_centroids
             
-    def kmeans_loop(self, max_iterations = 10, tolerance=1e-3, display_interval = 1):
+    def kmeans_loop(self, max_iterations = 10, tolerance=1e-3, display_interval = 0):
         """
         Perform K-means clustering algortihm on the input array.
 
@@ -328,8 +324,8 @@ class KMeans_Image:
         centroid_indices : list
             Initial indicies of centroids.
         """
-        
-        print(f"Starting k-means clustering in {self.colour_space} color space:")
+        if self.messages:
+            print(f"Starting k-means clustering in {self.colour_space} color space:")
         
         #Initialize centroids
         centroids, centroid_indices = self.__initalize_centroids()
@@ -342,12 +338,13 @@ class KMeans_Image:
             new_centroids = self.update_centroids(assignments, centroids)
             
             #Display the clustering progress
-            if i % display_interval == 0:
+            if display_interval and i % display_interval == 0:
                 self.visualize_clustering(assignments, centroids)
             
             #Check if centroids have converged
             if np.allclose(new_centroids, centroids, atol=tolerance):
-                print(f"Convergence reach after {i} iterations")
+                if self.messages:
+                    print(f"Convergence reach after {i} iterations")
                 break
             
             centroids = new_centroids
@@ -357,8 +354,42 @@ class KMeans_Image:
         self.final_centroids = centroids
         self.final_assignments = assignments
         
+        self.wcss = self.calculate_wcss()
+        
         return centroids, assignments, centroid_indices
     
+    def calculate_wcss(self):
+        """
+        Calculates within-cluster sum of squares.
+        """
+        if self.final_centroids is None or self.final_assignments is None:
+            return None
+    
+        # Separate pixels and their assignments into NumPy arrays
+        # This is the corrected section.
+        assignments = [item[1] for item in self.final_assignments]
+        pixels = [item[0] for item in self.final_assignments]
+        
+        final_assignments_np = np.array(assignments)
+        pixels_np = np.array(pixels)
+        final_centroids_np = np.array(self.final_centroids)
+        
+        wcss = 0
+        
+        # Loop through each cluster
+        for k in range(len(final_centroids_np)):
+            # Get pixels assigned to this cluster using boolean indexing
+            cluster_pixels = pixels_np[final_assignments_np == k]
+            
+            if len(cluster_pixels) > 0:
+                # Get the centroid for this cluster
+                centroid = final_centroids_np[k]
+                
+                # Calculate the sum of squared distances for this cluster
+                wcss += np.sum(np.linalg.norm(cluster_pixels - centroid, axis=1)**2)
+                
+        return wcss
+        
     def visualize_clustering(self, assignments, current_centroids):
         """
         Colour the centroid pixels of the image for visualization.
@@ -435,13 +466,7 @@ class KMeans_Image:
         
         # Create output image using gradient colors
         if self.ignore_background:
-            
-            print("Running when ignore_background = True")
-            
-            print(f"original_input_array length: {len(self.original_input_array)}")
-            print(f"image_shape: {self.image_shape}")
-            print(f"Expected total pixels: {self.image_shape[0] * self.image_shape[1] * self.image_shape[2]}")
-            
+
             temp_image = np.zeros((len(self.original_input_array), 3), dtype=np.uint8)
             temp_image[:] = [0,0,0]
             
@@ -449,15 +474,10 @@ class KMeans_Image:
                 original_pixel_idx = self.pixel_to_original_map[i]
                 temp_image[original_pixel_idx] = self.colours[centroid_idx]
                 
-            print(f"temp_image shape before reshape: {temp_image.shape}")
-            print(f"temp_image size: {temp_image.size}")
-                    
             # Reshape back to original image dimensions
             temp_image = temp_image.reshape(self.image_shape)
             
         else:
-            
-            print("Running when ignore_background = False")
             
             temp_image = np.zeros((len(self.final_assignments), 3), dtype=np.uint8)
             
@@ -533,16 +553,17 @@ class KMeans_Image:
         #Will choose a normailization value of 10million.
         
         colour_variance = r_var + g_var + b_var
-        print("Colour Variance = ", colour_variance)
+        #print("Colour Variance = ", colour_variance)
+        
         colour_variance /= 48768.75
         num_pixels_corrected = num_pixels / 1e7
         
-        print("Number of pixels = ", num_pixels)
+        #print("Number of pixels = ", num_pixels)
         
         
         combined_score = colour_variance * num_pixels_corrected
         
-        print(combined_score)
+        #print(combined_score)
         
         estimated_k = int(c_1 * np.log(1+combined_score) + c_2)
         
@@ -586,14 +607,16 @@ class KMeans_Image:
         plt.show()
 
     
-
+start = time.time()
 if __name__ == "__main__":
-    k=8
-    image_rgb = Image_To_Array("training_images/pixel_art_images/tree.png", "RGB")
-    image_rgb.show_image()
+    k=6
+    image_rgb = Image_To_Array("images/sunset2.jpg", "RGB")
+    #image_rgb.show_image()
     #colour_object = Colour_Map_Object()
     #colours=colour_object.gradient_colour_map(k, "void")
-    kmeans_rgb = KMeans_Image(image_rgb, k, ignore_background=True)
+    kmeans_rgb = KMeans_Image(image_rgb, k, ignore_background=False)
     kmeans_rgb.kmeans_loop(tolerance=1e-3,max_iterations=10, display_interval=1)
-    kmeans_rgb.visualize_with_gradient_colors()
-    print(kmeans_rgb.evaluate_k())
+    #kmeans_rgb.visualize_with_gradient_colors()
+    #print(kmeans_rgb.wcss)
+    end=time.time()
+    print(end-start)
