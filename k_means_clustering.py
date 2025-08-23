@@ -63,9 +63,9 @@ class KMeans_Image:
         
         black_mask = np.all(rgb_array <= self.background_threshold, axis=1)
         
-        white_mask = np.all(rgb_array >= (255-self.background_threshold), axis=1)
+        #white_mask = np.all(rgb_array >= (255-self.background_threshold), axis=1)
         
-        background_mask = black_mask | white_mask
+        background_mask = black_mask # | white_mask
         
         foreground_indicies = np.where(~background_mask)[0]
         
@@ -329,7 +329,7 @@ class KMeans_Image:
             Initial indicies of centroids.
         """
         
-        print(f"Starting k-means clustering in {self.colour_space} color space...")
+        print(f"Starting k-means clustering in {self.colour_space} color space:")
         
         #Initialize centroids
         centroids, centroid_indices = self.__initalize_centroids()
@@ -432,15 +432,40 @@ class KMeans_Image:
             print("No clustering results available. Run kmeans_loop() first.")
             return
         
-        # Create output image using gradient colors
-        clustered_image = np.zeros((len(self.final_assignments), 3), dtype=np.uint8)
         
-        # Assign each pixel the gradient color of its centroid
-        for i, (_, centroid_idx) in enumerate(self.final_assignments):
-            clustered_image[i] = self.colours[centroid_idx]
-           
-        # Reshape back to original image dimensions
-        clustered_image = clustered_image.reshape(self.image_shape)
+        # Create output image using gradient colors
+        if self.ignore_background:
+            
+            print("Running when ignore_background = True")
+            
+            print(f"original_input_array length: {len(self.original_input_array)}")
+            print(f"image_shape: {self.image_shape}")
+            print(f"Expected total pixels: {self.image_shape[0] * self.image_shape[1] * self.image_shape[2]}")
+            
+            temp_image = np.zeros((len(self.original_input_array), 3), dtype=np.uint8)
+            temp_image[:] = [0,0,0]
+            
+            for i, (_, centroid_idx) in enumerate(self.final_assignments):
+                original_pixel_idx = self.pixel_to_original_map[i]
+                temp_image[original_pixel_idx] = self.colours[centroid_idx]
+                
+            print(f"temp_image shape before reshape: {temp_image.shape}")
+            print(f"temp_image size: {temp_image.size}")
+                    
+            # Reshape back to original image dimensions
+            temp_image = temp_image.reshape(self.image_shape)
+            
+        else:
+            
+            print("Running when ignore_background = False")
+            
+            temp_image = np.zeros((len(self.final_assignments), 3), dtype=np.uint8)
+            
+            # Assign each pixel the gradient color of its centroid
+            for i, (_, centroid_idx) in enumerate(self.final_assignments):
+                temp_image[i] = self.colours[centroid_idx]
+                
+            temp_image = temp_image.reshape(self.image_shape)
         
         # Display comparison
         plt.figure(figsize=(10, 5))
@@ -450,17 +475,10 @@ class KMeans_Image:
         plt.imshow(self.image_object.rgb_image)
         plt.title('Original Image')
         plt.axis('off')
-        
-        # Show clustered with actual centroid colors
-        rgb_centroids = self.__convert_back_to_rgb(np.array(self.final_centroids))
-        actual_clustered = np.zeros((len(self.final_assignments), 3), dtype=np.uint8)
-        for i, (_, centroid_idx) in enumerate(self.final_assignments):
-            actual_clustered[i] = rgb_centroids[centroid_idx]
-        actual_clustered = actual_clustered.reshape(self.image_shape)
 
         # Show clustered with gradient colors
         plt.subplot(1, 3, 2)
-        plt.imshow(clustered_image)
+        plt.imshow(temp_image)
         plt.title('Custom Gradient Colors')
         plt.axis('off')
         
@@ -497,7 +515,7 @@ class KMeans_Image:
         
         return colors_rgb.tolist(), percentages
     
-    def evaluate_k(self, c_1=1, c_2=1, k_mult = 4):
+    def evaluate_k(self, c_1=1, c_2=1):
         
         rgb_array_np = np.array(self.rgb_array)
         
@@ -570,12 +588,12 @@ class KMeans_Image:
     
 
 if __name__ == "__main__":
-    k=4
+    k=8
     image_rgb = Image_To_Array("training_images/pixel_art_images/tree.png", "RGB")
     image_rgb.show_image()
     #colour_object = Colour_Map_Object()
     #colours=colour_object.gradient_colour_map(k, "void")
     kmeans_rgb = KMeans_Image(image_rgb, k, ignore_background=True)
     kmeans_rgb.kmeans_loop(tolerance=1e-3,max_iterations=10, display_interval=1)
-    kmeans_rgb = KMeans_Image(image_rgb, k, ignore_background=False)
-    kmeans_rgb.kmeans_loop(tolerance=1e-3,max_iterations=10, display_interval=1)
+    kmeans_rgb.visualize_with_gradient_colors()
+    print(kmeans_rgb.evaluate_k())
