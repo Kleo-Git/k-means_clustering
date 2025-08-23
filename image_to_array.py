@@ -21,14 +21,14 @@ class Image_To_Array:
         ----------
         filepath : str
             Path to the image file to be loaded.
-        color_space : str
-            Color space to convert to. 
+        colour_space : str
+            Colour space to convert to. 
             Options include:
                 'RGB' - Red, Green, Blue (default)
                 'LAB' - Lightness, A*, B* (perceptually uniform)
                 'HSV' - Hue, Saturation, Value  
-                'XYZ' - CIE XYZ color space
-                'LUV' - CIE LUV color space
+                'XYZ' - CIE XYZ colour space
+                'LUV' - CIE LUV colour space
             
         Attributes
         ----------
@@ -103,7 +103,7 @@ class Image_To_Array:
             converted = color.rgb2luv(rgb_normalized)
             
         else:
-            raise ValueError(f"Unsupported color space: {self.color_space}")
+            raise ValueError(f"Unsupported colour space: {self.colour_space}")
         
         return converted
     
@@ -134,7 +134,7 @@ class Image_To_Array:
         """
         plt.figure(figsize=(8, 6))
         plt.imshow(self.image)
-        plt.title(f'Image (displayed in RGB, processed in {self.color_space})')
+        plt.title(f'Image (displayed in RGB, processed in {self.colour_space})')
         plt.axis('off')
         plt.show()
         
@@ -147,14 +147,14 @@ class Image_To_Array:
         None.
 
         """
-        color_spaces = ["RGB", "LAB", "HSV", "XYZ", "LUV"]
-        fig, axes = plt.subplots(1, len(color_spaces), figsize=(20, 4))
+        colour_spaces = ["RGB", "LAB", "HSV", "XYZ", "LUV"]
+        fig, axes = plt.subplots(1, len(colour_spaces), figsize=(20, 4))
         
-        for i, space in enumerate(color_spaces):
-            # Create temporary image object with different color space
+        for i, space in enumerate(colour_spaces):
+            # Create temporary image object with different colour space
             temp_img = Image_To_Array(self.filepath, space)
             
-            # For display, we need to handle different color spaces differently
+            # For display, we need to handle different colour spaces differently
             if space == 'RGB':
                 display_img = temp_img.image
             elif space == 'HSV':
@@ -179,28 +179,28 @@ class Image_To_Array:
     
     def get_color_info(self):
         """
-        Get information about the current color space.
+        Get information about the current colour space.
         
         Returns
         -------
         dict
-            Information about color space ranges and characteristics.
+            Information about colour space ranges and characteristics.
         """
         info = {
-            'color_space': self.color_space,
+            'coluor_space': self.colour_space,
             'image_shape': self.image_shape,
-            'pixel_count': len(self.color_array)
+            'pixel_count': len(self.colour_array)
         }
         
-        if self.color_space == 'RGB':
+        if self.colour_space == 'RGB':
             info['ranges'] = 'R,G,B: 0-255'
-        elif self.color_space == 'LAB':
+        elif self.colour_space == 'LAB':
             info['ranges'] = 'L: 0-100, A,B: -127 to +127'
-        elif self.color_space == 'HSV':
+        elif self.colour_space == 'HSV':
             info['ranges'] = 'H: 0-179, S,V: 0-255 (OpenCV format)'
-        elif self.color_space == 'XYZ':
+        elif self.colour_space == 'XYZ':
             info['ranges'] = 'X,Y,Z: 0-100+ (scaled)'
-        elif self.color_space == 'LUV':
+        elif self.colour_space == 'LUV':
             info['ranges'] = 'L: 0-100, U,V: varies'
             
         return info

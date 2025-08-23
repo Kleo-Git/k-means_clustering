@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 class KMeans_Image:
     
-    def __init__(self, image_object, k, colours=None, colour_space=None):
+    def __init__(self, image_object, k=None, colours=None, colour_space=None, ignore_background = False, background_threshold = 10):
         """
         Intialize KMeans_Image object
 
@@ -27,25 +27,53 @@ class KMeans_Image:
         """
         self.image_object = image_object
         
-        self.input_array = image_object.colour_array
-        self.rgb_array = image_object.rgb_array
+        self.original_input_array = image_object.colour_array
+        self.original_rgb_array = image_object.rgb_array
         
         self.image = image_object.image
         self.image_shape = image_object.image_shape
         
         self.k = k
+        if self.k == None:
+            self.k = self.evaluate_k()
         
         self.colour_space = image_object.colour_space
+        
+        self.ignore_background = ignore_background
+        self.background_threshold = background_threshold
+        
+        if self.ignore_background:
+            self.__setup_filtered_arrays()
+            print(f"Using {len(self.input_array)} foreground pixels out of {len(self.original_input_array)} total")
+        else:
+            self.input_array = self.original_input_array
+            self.rgb_array = self.original_rgb_array
+            self.pixel_to_original_map = list(range(len(self.input_array)))
         
         self.final_centroids = None
         self.final_assignments = None
         
         #Colours used for visualization
         self.colours = colours
-        
         if self.colours == None:
             self.colours = Colour_Map_Object().hsv_colour_map(self.k)
             
+    def __setup_filtered_arrays(self):
+        rgb_array = np.array(self.original_rgb_array)
+        
+        black_mask = np.all(rgb_array <= self.background_threshold, axis=1)
+        
+        white_mask = np.all(rgb_array >= (255-self.background_threshold), axis=1)
+        
+        background_mask = black_mask | white_mask
+        
+        foreground_indicies = np.where(~background_mask)[0]
+        
+        self.input_array = [self.original_input_array[i] for i in foreground_indicies]
+        self.rgb_array = [self.original_rgb_array[i] for i in foreground_indicies]
+
+        self.pixel_to_original_map = foreground_indicies.tolist()
+        
     def __convert_colour_space(self, rgb_array):
         """
         Convert RGB array to specified colour space
@@ -169,6 +197,7 @@ class KMeans_Image:
         #Picked indicies will be used for visualisation
         picked_values = []
         picked_indices = []
+        
         
         #If k is larger then number of pixels would cause an infinite loop
         if self.k > num_pixels:
@@ -345,16 +374,25 @@ class KMeans_Image:
 
         """
         
+
+        
         #Generate distinct colours for each centroid.
         #colours = self.colour_map(saturation, value)
         rgb_centroids = self.__convert_back_to_rgb(np.array(current_centroids))
         
         #Make a copy of image so original is not modified.
         #temp_image = self.image.copy().reshape(-1, 3)
-        temp_image = np.zeros((len(assignments), 3), dtype=np.uint8)
+        temp_image = np.zeros((len(self.original_input_array), 3), dtype=np.uint8)
         
-        for i, (_, centroid_idx) in enumerate(assignments):
-            temp_image[i] = rgb_centroids[centroid_idx]
+        if self.ignore_background:
+            temp_image[:] = [0,0,0]
+            
+            for i, (_, centroid_idx) in enumerate(assignments):
+                original_pixel_idx = self.pixel_to_original_map[i]
+                temp_image[original_pixel_idx] = rgb_centroids[centroid_idx]
+        else:
+            for i, (_, centroid_idx) in enumerate(assignments):
+                temp_image[i] = rgb_centroids[centroid_idx]
            
         temp_image = temp_image.reshape(self.image.shape)
         #Display recoloured image.
@@ -459,15 +497,85 @@ class KMeans_Image:
         
         return colors_rgb.tolist(), percentages
     
+    def evaluate_k(self, c_1=1, c_2=1, k_mult = 4):
+        
+        rgb_array_np = np.array(self.rgb_array)
+        
+        num_pixels = len(rgb_array_np)
+        
+        r_var= np.var(rgb_array_np[:, 0])
+        g_var = np.var(rgb_array_np[:, 1])
+        b_var= np.var(rgb_array_np[:, 2])
+        
+        #Maximum variance = half pixels at 0, half pixels at 255.
+        #Equvialently, a deviation of 127.5 for all pixels from the mean.
+        #Deviation = 127.5**2 = 16256.25
+        #Colour variance shoudl be normalized by 3*16256.25 = 48768.75
+        #Assuming a max image size of roughly 3840x2160 (4k image)
+        #Will choose a normailization value of 10million.
+        
+        colour_variance = r_var + g_var + b_var
+        print("Colour Variance = ", colour_variance)
+        colour_variance /= 48768.75
+        num_pixels_corrected = num_pixels / 1e7
+        
+        print("Number of pixels = ", num_pixels)
+        
+        
+        combined_score = colour_variance * num_pixels_corrected
+        
+        print(combined_score)
+        
+        estimated_k = int(c_1 * np.log(1+combined_score) + c_2)
+        
+        return estimated_k
+        
+        
+    
+    def compare_color_spaces(self, color_spaces=["RGB", "LAB", "HSV", "XYZ", "LUV"]):
+        """
+        Compare clustering results across different color spaces
+        
+        Parameters
+        ----------
+        color_spaces : list
+            List of color spaces to compare
+        """
+        fig, axes = plt.subplots(1, len(color_spaces) + 1, figsize=(4 * (len(color_spaces) + 1), 4))
+        
+        # Show original
+        axes[0].imshow(self.image)
+        axes[0].set_title('Original')
+        axes[0].axis('off')
+        
+        for i, space in enumerate(color_spaces):
+            # Create new instance with different color space
+            kmeans_temp = KMeans_Image(self.image_object, self.k, space)
+            centroids, assignments, _ = kmeans_temp.kmeans_loop(max_iterations=10)
+            
+            # Visualize
+            display_centroids = kmeans_temp.__convert_back_to_rgb(centroids)
+            clustered_image = np.zeros_like(self.rgb_array)
+            for j, (_, centroid_idx) in enumerate(assignments):
+                clustered_image[j] = display_centroids[centroid_idx]
+            
+            clustered_image = clustered_image.reshape(self.image_shape)
+            axes[i + 1].imshow(clustered_image.astype(int))
+            axes[i + 1].set_title(f"{space} (k={self.k})")
+            axes[i + 1].axis('off')
+        
+        plt.tight_layout()
+        plt.show()
 
     
 
 if __name__ == "__main__":
     k=4
-    image_rgb = Image_To_Array("images/sunset2.jpg", "RGB")
-    colour_object = Colour_Map_Object()
-    colours=colour_object.gradient_colour_map(k, "void")
-    kmeans_rgb = KMeans_Image(image_rgb, k, colours)
-    kmeans_rgb.kmeans_loop(max_iterations=10, display_interval=9)
-    print(kmeans_rgb.get_dominant_colors())
-
+    image_rgb = Image_To_Array("training_images/pixel_art_images/tree.png", "RGB")
+    image_rgb.show_image()
+    #colour_object = Colour_Map_Object()
+    #colours=colour_object.gradient_colour_map(k, "void")
+    kmeans_rgb = KMeans_Image(image_rgb, k, ignore_background=True)
+    kmeans_rgb.kmeans_loop(tolerance=1e-3,max_iterations=10, display_interval=1)
+    kmeans_rgb = KMeans_Image(image_rgb, k, ignore_background=False)
+    kmeans_rgb.kmeans_loop(tolerance=1e-3,max_iterations=10, display_interval=1)
