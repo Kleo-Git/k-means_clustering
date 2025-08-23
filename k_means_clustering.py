@@ -154,32 +154,6 @@ class KMeans_Image:
         
         else:
             raise ValueError(f"Unsupported color space: {self.colour_space}")
-        
-    def calculate_distance(self, position1, position2):
-        """
-        Compute the Eucledian distance between 2 points in n-dimensional space.
-
-        Parameters
-        ----------
-        position1 : list
-            Coordinates of the first point.
-        position2 : list
-            Coordinates of the second point.
-
-        Returns
-        -------
-        distance : float
-            The total distance between position1 and position2.
-
-        """
-        #Calculates the squared sum of the differences in x,y,z positions.
-        squared_sum = sum((a-b) ** 2 for a, b in zip(position1,position2))
-        
-        #Square root the squared sum to get total distance using pythagoras' theorem.
-        distance = np.sqrt(squared_sum)
-        
-        #Return distance
-        return distance
     
     def __initalize_centroids(self):
         """
