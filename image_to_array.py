@@ -2,15 +2,16 @@ import cv2 as cv
 import matplotlib.pyplot as plt
 import numpy as np
 from skimage import color
+from PIL import Image
 
 
 class Image_To_Array:
     """
-    A utility class that converts an image into an array of RGB values.
+    A utility class that converts an image into pixel arrays in different colours space.
     
-    The image is read from a file and stored both as a 3D NumPy array
-    (height x width x 3) and as a flattened list (height*width, 3), of RGB values for each
-    pixel, ordered from top-left to bottom-right pixel.
+    The class lads an image from disk, converts it to the desired colour space, and
+    provides both 3D image arrays (height x width x channels) and flattened 2D
+    arrays (num_pixels x channels).
     """
     
     def __init__(self, filepath, colour_space = "RGB"):
@@ -21,7 +22,7 @@ class Image_To_Array:
         ----------
         filepath : str
             Path to the image file to be loaded.
-        colour_space : str
+        colour_space : str, optional
             Colour space to convert to. 
             Options include:
                 'RGB' - Red, Green, Blue (default)
@@ -34,12 +35,18 @@ class Image_To_Array:
         ----------
         filepath : str
             Path of input image.
-        image : ndarray
-            The image stored as a NumPy array in RGB format.
-        rgb_array : list
-            Flattened list of RGB values for each pixel in row-major order.
+        colour_space : str
+            Target colour space of the processed image.
+        rgb_image : ndarray
+            Original image stored as a NumPy array in RGB format, shape (H,W,3)
         image_shape : tuple
-            Shape of the image as (height, width, channels).
+            Shape of the input image as (H,W,Channels)
+        image : ndarray
+            Image converted into selected colour space, shape (H,W,3)
+        rgb_array : ndarray
+            Flattened array of RGB pixel values.
+        colour_array : ndarray
+            Flattened array of pixel values in target colour space.
             
         Returns
         -------
@@ -57,13 +64,13 @@ class Image_To_Array:
         self.rgb_array = self.__flatten_image(self.rgb_image)
         self.colour_array = self.__flatten_image(self.image)
         
-    #Private method to convert image to array
+    #Private method to convert image as RGB array.
     def __load_rgb_image(self):
         """
         Convert the input image file into an RGB NumPy array.
         
         Uses OpenCV to read the image in BGR format and converts
-        to RGB
+        to RGB.
 
         Returns
         -------
@@ -77,23 +84,43 @@ class Image_To_Array:
     
     def __convert_colour_space(self):
         """
+        Convert the loaded RGB image to the target colour space.
         
+        Allows for the following colour space:
+            - 'RGB' : Returns a copy of the original RGB image
+            - 'LAB' : CIELAB (uses skimage, expects float in [0, 1])
+            - 'HSV' : OpenCV HSV (H: 0-179, S/V: 0-255)
+            - 'XYZ' : CIE 1931 XYZ (skimage, scaled by 100)
+            - 'LUV' : CIE 1976 L*u*v* (skimage, expects float in [0, 1])
+            
+        Normalization : For skimage conversions (LAB, XYZ, LUV) the RGB
+        image is first normalised to [0,1].
 
         Returns
         -------
-        None.
+        converted : ndarray
+            Image converted to the specified colour space, with shape (H,W,3)
+            dtype=float32 for most colour spaces.
+            
+        Raises
+        ------
+        ValueError
+            If an unsupported colour space is specified.
 
         """
         if self.colour_space == 'RGB':
             return self.rgb_image.copy()
         
+        #Normalize RGB to [0,1] for skimage conversions
         rgb_normalized = self.rgb_image.astype(np.float32) / 255.0
         
+        #Check all options and convert to desired colour space, handled by skimage color
+        #or cv2 for HSV colour space.
         if self.colour_space == 'LAB':
             converted = color.rgb2lab(rgb_normalized)
             
         elif self.colour_space == 'HSV':
-            # Use OpenCV for HSV (different from skimage HSV)
+            # OpenCV HSV ranges: H 0-179, S/V 0-255
             converted = cv.cvtColor(self.rgb_image, cv.COLOR_RGB2HSV).astype(np.float32)
             
         elif self.colour_space == 'XYZ':
@@ -110,58 +137,82 @@ class Image_To_Array:
     #Flatten to combined array each pixel has 3 numbers that represent RGB
     def __flatten_image(self, img):
         """
-        Flatten the image into a list of RGB values.
+        Flatten a 3D image array (H,W,Channels) into a 2D list of pixel values.
         
-        Iterates row by row through the image and extracts
-        the RGB values for each pixel.
+        Each pixel is represented as a list of three numbers corresponding 
+        to its colour channels (e.g. [R,G,B] for RGB or [L,A,B] for LAB).
+        
+        Parameters
+        ----------
+        img : ndarray
+            The image as a NumPy array of shape (height, width, 3).
 
         Returns
         -------
-        full_list : list of list[int]
-            The list where each element is [R,G,B] for a given pixel.
-            The shape of the list will be (height*width, 3).
+        img : list of list[int or float]
+            Flattened list where each element is a 3-element list for a pixel.
+            Total length of the list will be height*width.
 
         """
-        #full_list = []
-        #for i in range(self.image.shape[0]):
-        #    for j in range(self.image.shape[1]):
-        #        full_list.append(self.image[i][j].tolist())
+        #Use numpy to efficiently reshape and convert to list
         return img.reshape(-1, 3).tolist()
     
     def show_image(self):
         """
-        Displays the image using matplotlib.
+        Display the current image using MatPlotLib.
+        
+        Assumes the image is in a displayable format, uses 'self.image' for display.
+
+        Returns
+        -------
+        AttributeError
+            If the image data is not loaded.
+
         """
-        plt.figure(figsize=(8, 6))
-        plt.imshow(self.image)
-        plt.title(f'Image (displayed in RGB, processed in {self.colour_space})')
-        plt.axis('off')
-        plt.show()
+        try:
+            import matplotlib.pyplot as plt # Import matplotlib locally for display
+            plt.imshow(self.img_data)
+            plt.axis('off')
+            plt.show()
+        except:
+            print("No image data to display.")
         
     def show_colour_space_comparison(self):
         """
+        Display the same image in multiple colour spaces for visual comparison.
         
-
+        Displays the 5 supported colour spaces side by side:
+        "RGB", "LAB", "HSV", "XYZ", "LUV"
+        Converts images back to RGB for display purposes.
+        
+        Notes
+        -----
+        - HSV is converted using OpenCV
+        - LAB, XYZ and LUV are converted back to RGB using skimage.
+        
+        
         Returns
         -------
         None.
 
         """
+        #Supported colour spaces
         colour_spaces = ["RGB", "LAB", "HSV", "XYZ", "LUV"]
+        #Plotting images in given size
         fig, axes = plt.subplots(1, len(colour_spaces), figsize=(20, 4))
         
         for i, space in enumerate(colour_spaces):
-            # Create temporary image object with different colour space
+            #Create temporary image object with different colour space
             temp_img = Image_To_Array(self.filepath, space)
             
-            # For display, we need to handle different colour spaces differently
+            #Handle display conversion
             if space == 'RGB':
                 display_img = temp_img.image
             elif space == 'HSV':
-                # Convert back to RGB for display
+                #Convert back to RGB for display
                 display_img = cv.cvtColor(temp_img.image.astype(np.uint8), cv.COLOR_HSV2RGB)
             else:
-                # For LAB, XYZ, LUV - convert back to RGB for display
+                #For LAB, XYZ, LUV convert back to RGB for display
                 if space == 'LAB':
                     display_img = color.lab2rgb(temp_img.image)
                 elif space == 'XYZ':
@@ -170,6 +221,7 @@ class Image_To_Array:
                     display_img = color.luv2rgb(temp_img.image)
                 display_img = np.clip(display_img * 255, 0, 255).astype(np.uint8)
             
+            #Handle image labelling
             axes[i].imshow(display_img)
             axes[i].set_title(f'{space}')
             axes[i].axis('off')
@@ -179,19 +231,24 @@ class Image_To_Array:
     
     def get_color_info(self):
         """
-        Get information about the current colour space.
+        Retrieve data about the current image and its colour space.
         
         Returns
         -------
-        dict
-            Information about colour space ranges and characteristics.
+        info : dict
+            Dictionary containing:
+                - "colour_space" : str, current colour space
+                - "image_shape" : tuple, shape of the image (H,W,Channels)
+                - "pixel_count" : int, total number of pixels
+                - "ranges" : str, typical value ranges for each channel in the colour space
         """
         info = {
-            'coluor_space': self.colour_space,
+            'colour_space': self.colour_space,
             'image_shape': self.image_shape,
             'pixel_count': len(self.colour_array)
         }
         
+        #Typical value ranges for given colour space and convention.
         if self.colour_space == 'RGB':
             info['ranges'] = 'R,G,B: 0-255'
         elif self.colour_space == 'LAB':
@@ -212,6 +269,7 @@ if __name__ == "__main__":
     image_path = "images/test_image.jpg"
     image_path2 = "images/test_image2.jpg"
     image_path3 = "images/test_image3.jpg"
+    image_path4 = "images/lion_test.jpg"
     
     
     #Reading image paths, and finding pixel values
@@ -235,4 +293,5 @@ if __name__ == "__main__":
     plt.imshow(img3)
     plt.show()
     
-    image_rgb = Image_To_Array(image_path, "RGB")
+    image_rgb = Image_To_Array(image_path4, "RGB")
+    image_rgb.show_colour_space_comparison()

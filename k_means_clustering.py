@@ -9,18 +9,55 @@ import time
 
 class KMeans_Image:
     
-    def __init__(self, image_object, k=None, colours=None, colour_space=None, ignore_background = False, background_threshold = 10, messages=False):
+    def __init__(self, image_object, k, colours=None, colour_space=None, ignore_background = False, background_threshold = 5, messages=False):
         """
-        Intialize KMeans_Image object
+        Intialize KMeans_Image object for k-means clustering on image data.
 
         Parameters
         ----------
-        input_array : list of list[int]
-            The list where each element is [R,G,B] for a given pixel.
-            The shape of the list will be (height*width, 3).
+        image_object : object
+            Image object containing image specific data attributes. Colour array
+            should be [H*W, 3] with each row representing [R,G,B] values for a pixel.
         k : int
             Number of centroids used for k-means clustering.
-
+        colours : array[R,G,B], optional
+            Custom colors to use for visualization. Default is None.
+            default = None.
+        ignore_background : bool, optional
+            Whether to ignore background during clustering. Primarily useful for pixel
+            art images / images with empty background. 
+            default = False
+        background_threshold : int, optional
+            Threshold value for determining background pixels when ignore_background
+            is True. Pixels with all RGB values <= this threshold are considered background.
+            default = 5
+        messages : bool, optional
+            Whether to display certain messages during processing.
+            default = False
+        
+        Attributes
+        ----------
+        image_object : object
+            Reference to the input image object
+        original_input_array : array
+            Copy of the original colour array from image_object  
+        original_rgb_array : array
+            Copy of the original RGB array from image_object
+        image : array-like
+            The image data from image_object
+        image_shape : tuple
+            Shape of the image from image_object
+        k : int
+            Number of clusters
+        colour_space : str
+            Color space of the image from image_object
+        ignore_background : bool
+            Background ignoring flag
+        background_threshold : int
+            Background threshold value
+        messages : bool
+            Message display flag
+        
         Returns
         -------
         None.
@@ -35,8 +72,6 @@ class KMeans_Image:
         self.image_shape = image_object.image_shape
         
         self.k = k
-        if self.k == None:
-            self.k = self.evaluate_k()
         
         self.colour_space = image_object.colour_space
         
@@ -46,6 +81,7 @@ class KMeans_Image:
         self.messages = messages
         
         if self.ignore_background:
+            #Ignores pixels within the threshold
             self.__setup_filtered_arrays()
             if self.messages:
                 print(f"Using {len(self.input_array)} foreground pixels out of {len(self.original_input_array)} total")
@@ -54,6 +90,7 @@ class KMeans_Image:
             self.rgb_array = self.original_rgb_array
             self.pixel_to_original_map = list(range(len(self.input_array)))
         
+        #Used for evaluating end results, and visualizing with gradient
         self.final_centroids = None
         self.final_assignments = None
         
@@ -63,25 +100,69 @@ class KMeans_Image:
             self.colours = Colour_Map_Object().hsv_colour_map(self.k)
             
     def __setup_filtered_arrays(self):
+        """
+        Filter out background pixels from the input arrays based on background_threshold
+        
+        Creates filtered versions of the input_array and rgb_array containing only
+        foreground pixels. Background pixels are identified as those with all RGB
+        values <= background_threshold.
+
+        Returns
+        -------
+        None.
+
+        """
+        
+        #Convert to NumPy array
         rgb_array = np.array(self.original_rgb_array)
         
+        #Find all values that are considered 'black' pixels to ignore
         black_mask = np.all(rgb_array <= self.background_threshold, axis=1)
         
+        #Unused since background defaults to black and can invalidate images with
+        #white pixels.
         #white_mask = np.all(rgb_array >= (255-self.background_threshold), axis=1)
         
+        #Currently only black background is considered
         background_mask = black_mask # | white_mask
         
+        #Get indicies of pixels that are not background
         foreground_indicies = np.where(~background_mask)[0]
         
+        #Filter input and RGB arrays to only include foreground pixels
         self.input_array = [self.original_input_array[i] for i in foreground_indicies]
         self.rgb_array = [self.original_rgb_array[i] for i in foreground_indicies]
-
+        
+        #Store a mapping back to the original indicies for later reference
         self.pixel_to_original_map = foreground_indicies.tolist()
         
     def __convert_colour_space(self, rgb_array):
         """
         Convert RGB array to specified colour space
+        
+        Parameters
+        ----------
+        rgb_array : array
+            RGB pixel values in range [0,255]
+
+        Raises
+        ------
+        ValueError
+            If colour_space is not supported.
+
+        Returns
+        -------
+        converted_array : ndarray
+            Pixel values converted to the target colour space:
+            -RGB : [0, 255] range
+            -LAB : L*a*b* values
+            -HSV : H[0,360], S&V[0,100] 
+            -XYZ : XYZ values
+            -LUV : L*u*v* values
+
         """
+        
+        #Normalize array between [0,1]
         rgb_normalized = np.array(rgb_array) / 255
         
         if self.colour_space == "RGB":
@@ -110,17 +191,23 @@ class KMeans_Image:
             
     def __convert_back_to_rgb(self, colour_values):
         """
-        Convert color values back to RGB for display
+        Convert color values from current color space back to RGB for display.
         
         Parameters
         ----------
-        color_values : numpy array
+        color_values : ndarray
             Values in the current color space
+            
+        Raises
+        ------
+            ValueError
+                If colour_space is not supported.
             
         Returns
         -------
-        rgb_values : numpy array
-            RGB values (0-255)
+        rgb_values : ndarray
+            RGB values in range [0,255]
+            
         """
         
         colour_values = np.array(colour_values)
@@ -157,13 +244,21 @@ class KMeans_Image:
     
     def __initalize_centroids(self):
         """
-        Randomly selects k unique centroids from the flattened input array
+        Randomly selects k unique centroids from the input pixel array
+        
+        Selects k random pixels as initial centroids, ensuring no duplicates.
+        Uses random sampling without replacement to guarantee uniqueness.
 
         Returns
         -------
         picked_values : list
-            List of indices of randomly selected centroids.
-            Each index corresponds to a pixel in self.input_array (flattened row-wise).
+            List of k centroid color values selected from input_array
+        picked_indices : list
+            List of k indices corresponding to the selected centroids in input_array
+            
+        Notes
+        -----
+        Current implementation could be optimized using random.sample
 
         """
         
@@ -179,8 +274,8 @@ class KMeans_Image:
         
         #If k is larger then number of pixels would cause an infinite loop
         if self.k > num_pixels:
-            print("Attempting to pick too many centroids for given image size")
-            return
+            raise ValueError("Attempting to pick too many centroids for given image size")
+
         
         #Should be much more efficient to use this.
         #random.sample(range(num_pixels), k)
@@ -203,19 +298,21 @@ class KMeans_Image:
             
     def assign_to_centroids(self, centroids):
         """
-        Assign each pixel in the input array to the nearest centroid based on 
-        Euclidean distance in RGB space.
+        Assign each pixel to the nearest centroid based on Euclidean distance in 
+        colour space.
 
         Parameters
         ----------
-        centroids : list of list[float]
-            List of current centroid coordinates, where each centroid is [R,G,B].
-
+        centroids : array-like
+            List or array of current centroid coordinates, shape (k, 3)
+            
         Returns
         -------
-        assignments : list
-            List of [pixel, assigned_centroid_index] pairs, where "pixel" is the original
-            pixel value and "assigned_centroid_index" is the index of the nearest centroid.
+        pixels : ndarray
+            Array of pixel values, shape (num_pixels, 3)
+        nearest : ndarray
+            Array of centroid indices, shape (n_pixels,), where nearest[i] 
+            is the index of the closest centroid for pixel i
 
         """
 
@@ -236,23 +333,28 @@ class KMeans_Image:
     
     def update_centroids(self, pixels, nearest, current_centroids):
         """
-        Compute the new centroid positions as the mean of all pixels
-        assigned to the given centroid.
+        Update centroid positions as the mean of assigned pixels.
+        
+        Computes new centroid positions by averaging all pixels assigned to each
+        centroid. If a centroid has no assigned pixels, it retains its previous position.
 
         Parameters
         ----------
-        assignment_list : list
-            List of [pixel, assigned_centroid_index] pairs from "assign_to_centroids".
-        current_centroids : list of list[float]
-            Current centroid coordinates.
+        pixels : numpy.ndarray
+            Array of pixel values, shape (n_pixels, 3)
+        nearest : numpy.ndarray
+            Array of centroid assignments for each pixel, shape (n_pixels,)
+        current_centroids : array-like
+            Current centroid coordinates, shape (k, 3)
 
         Returns
         -------
-        new_centroids : list of list[float]
+        new_centroids : ndarray
             Updated centroid coordinates based on mean of assigned pixels.
             If a centroid has no assigned pixels, it retains its previous position.
 
         """
+        
         k = len(current_centroids)
         new_centroids = np.zeros((k, 3))
         
@@ -273,28 +375,37 @@ class KMeans_Image:
     def kmeans_loop(self, max_iterations = 10, tolerance=1e-3, display_interval = 0):
         """
         Perform K-means clustering algortihm on the input array.
+        
+        Iteratively assigns pixels to nearest centroids and updates centroid positions
+        until they convergence or a max number of iterations is reached.
+        Optionally displays clustering progress at specified intervals.
 
         Parameters
         ----------
         max_iterations : int, optional
             Maximum number of iterations to run.
-            Default is 10.
+            default = 10.
         tolerance : float, optional
             Threshold for minimum centroid movement to determine convergence.
-            Default is 1e-3.
+            default = 1e-3.
         display_interval : int, optional
             Number of iterations between visual outputs of centriod assignments.
-            Default is 1.
+            If display_interval = 0, no images are shown.
+            default = 0.
 
         Returns
         -------
-        centroids : list of list[float]
-            Final centroid positions after convergence (or max iterations).
-        assignments : list
-            Final assignments of each pixel to a centroid.
+        centroids : ndarray
+            Final centroid positions after convergence (or max iterations) with shape (k, 3).
+        pixels : numpy.ndarray
+            Pixel values used in clustering, shape (n_pixels, 3).
+        nearest : numpy.ndarray
+            Final assignment of each pixel to centroid index, shape (n_pixels,).
         centroid_indices : list
             Initial indicies of centroids.
         """
+        
+        #Only show if messages enabled
         if self.messages:
             print(f"Starting k-means clustering in {self.colour_space} color space:")
         
@@ -331,8 +442,23 @@ class KMeans_Image:
     
     def calculate_wcss(self):
         """
-        Calculates within-cluster sum of squares.
+        Calculate Within-Cluster Sum of Squares (WCSS) for the clustering results.
+        
+        WCSS measures the sum of squared distances from each pixel to its assigned
+        centroid across all clusters. Lower values indicate tighter clusters.
+        
+        Returns
+        -------
+        wcss : float or None
+            Within-cluster sum of squares value. Returns None if no clustering
+            results are available (final_centroids or final_assignments is None).
+            
+        Notes
+        -----
+        Requires that kmeans_loop() has been run first to evaluate final_centroids
+        and final_assignments attributes.
         """
+        
         if self.final_centroids is None or self.final_assignments is None:
             return None
     
@@ -361,20 +487,32 @@ class KMeans_Image:
         
     def visualize_clustering(self, pixels, nearest, current_centroids):
         """
-        Colour the centroid pixels of the image for visualization.
+        Visualize current clustering state with side-by-side comparison.
         
-        Each centroid in self.centroids is assinged a distinct colour
-        generated from HSV colour space by default. The colours are displayed on a 
-        copy of the image to avoid modifying values of the original.
+        Displays the original image alongside the current clustering result,
+        where each pixel is colored according to its assigned centroid's color.
+        Used during kmeans_loop() to show clustering progress.
+
+        Parameters
+        ----------
+        pixels : numpy.ndarray
+            Current pixel values, shape (n_pixels, 3)
+        nearest : numpy.ndarray  
+            Current centroid assignments, shape (n_pixels,)
+        current_centroids : numpy.ndarray
+            Current centroid positions, shape (k, 3)
 
         Returns
         -------
-        None.
-            Displayes the image with centroid pixels coloured using matplotlib.
-
+        None
+            Displays matplotlib figure with original and clustered images
+            
+        Notes
+        -----
+        Handles both background filtering and non-filtering modes. When 
+        ignore_background=True, background pixels are colored black and only
+        foreground pixels show cluster colors.
         """
-        
-
         
         #Generate distinct colours for each centroid.
         #colours = self.colour_map(saturation, value)
@@ -416,15 +554,24 @@ class KMeans_Image:
         
     def visualize_with_gradient_colors(self):
         """
-        Visualize the final clustering result using the custom gradient colors.
+        Visualize final clustering results using custom gradient colors.
         
+        Creates a visualization where each cluster is displayed using colors
+        from the self.colours attribute instead of the centroid colors.
+        Shows original image and custom-colored clustering side by side.
+
         Returns
         -------
-        None.
-            Displayes the image with centroid pixels coloured using matplotlib.
-
-        
+        None
+            Displays matplotlib figure comparing original and custom-colored results
+            
+        Notes
+        -----
+        Requires that kmeans_loop() has been run first. Uses self.colours for
+        cluster visualization instead of centroid colors. Prints error message
+        if no clustering results are available.
         """
+        
         if self.final_centroids is None or self.final_assignments is None:
             print("No clustering results available. Run kmeans_loop() first.")
             return
@@ -472,15 +619,27 @@ class KMeans_Image:
     
     def get_dominant_colors(self):
         """
-        Get the dominant colors from clustering results
+        Extract dominant colors and their proportions from clustering results.
+        
+        Returns the final centroid colors converted to RGB format along with
+        the percentage of the image that each color represents.
         
         Returns
         -------
-        colors_rgb : list
-            List of dominant colors in RGB format
-        percentages : list  
-            Percentage of image each color represents
+        colors_rgb : list or None
+            List of dominant colors in RGB format as [R, G, B] values.
+            Returns None if no clustering results available.
+        percentages : list or None
+            List of percentages (0-100) indicating what proportion of the image
+            each corresponding color represents. Returns None if no clustering 
+            results available.
+            
+        Notes
+        -----
+        Requires that kmeans_loop() has been run first. Colors are returned
+        in RGB format regardless of the color space used for clustering.
         """
+        
         if self.final_centroids is None or self.final_assignments is None:
             print("No clustering results available. Run kmeans_loop() first.")
             return None, None
@@ -500,51 +659,32 @@ class KMeans_Image:
     
         return colors_rgb.tolist(), percentages.tolist()
     
-    def evaluate_k(self, c_1=1, c_2=1):
-        
-        rgb_array_np = np.array(self.rgb_array)
-        
-        num_pixels = len(rgb_array_np)
-        
-        r_var= np.var(rgb_array_np[:, 0])
-        g_var = np.var(rgb_array_np[:, 1])
-        b_var= np.var(rgb_array_np[:, 2])
-        
-        #Maximum variance = half pixels at 0, half pixels at 255.
-        #Equvialently, a deviation of 127.5 for all pixels from the mean.
-        #Deviation = 127.5**2 = 16256.25
-        #Colour variance shoudl be normalized by 3*16256.25 = 48768.75
-        #Assuming a max image size of roughly 3840x2160 (4k image)
-        #Will choose a normailization value of 10million.
-        
-        colour_variance = r_var + g_var + b_var
-        #print("Colour Variance = ", colour_variance)
-        
-        colour_variance /= 48768.75
-        num_pixels_corrected = num_pixels / 1e7
-        
-        #print("Number of pixels = ", num_pixels)
-        
-        
-        combined_score = colour_variance * num_pixels_corrected
-        
-        #print(combined_score)
-        
-        estimated_k = int(c_1 * np.log(1+combined_score) + c_2)
-        
-        return estimated_k
-        
-        
-    
     def compare_color_spaces(self, color_spaces=["RGB", "LAB", "HSV", "XYZ", "LUV"]):
         """
-        Compare clustering results across different color spaces
+        Compare K-means clustering results across different color spaces.
         
+        Performs clustering using the same parameters but different color spaces
+        and displays the results side by side for visual comparison.
+
         Parameters
         ----------
-        color_spaces : list
-            List of color spaces to compare
+        color_spaces : list, optional
+            List of color space strings to compare. Default is 
+            ["RGB", "LAB", "HSV", "XYZ", "LUV"].
+
+        Returns
+        -------
+        None
+            Displays matplotlib figure with original image and clustering results
+            for each specified color space
+            
+        Notes
+        -----
+        Creates temporary KMeans_Image instances for each color space comparison.
+        Each clustering uses the same k value and runs for 10 iterations.
+        Results show how different color spaces affect clustering outcomes.
         """
+        
         fig, axes = plt.subplots(1, len(color_spaces) + 1, figsize=(4 * (len(color_spaces) + 1), 4))
         
         # Show original
@@ -572,16 +712,17 @@ class KMeans_Image:
         plt.show()
 
     
-start = time.time()
+
 if __name__ == "__main__":
-    k=64
+    start = time.time()
+    k=16
     image_rgb = Image_To_Array("images/lion_test.jpg", "RGB")
     #image_rgb.show_image()
     colour_object = Colour_Map_Object()
-    colours=colour_object.gradient_colour_map(k, "void")
+    colours=colour_object.gradient_colour_map(k, "snw")
     kmeans_rgb = KMeans_Image(image_rgb, k, colours=colours, ignore_background=False)
-    kmeans_rgb.kmeans_loop(tolerance=1e-3,max_iterations=10, display_interval=9)
-    #kmeans_rgb.visualize_with_gradient_colors()
-    print(kmeans_rgb.wcss)
-    end=time.time()
-    print(end-start)
+    kmeans_rgb.kmeans_loop(tolerance=1e-3,max_iterations=1000, display_interval=9)
+    kmeans_rgb.visualize_with_gradient_colors()
+    #print(kmeans_rgb.wcss)
+    #end=time.time()
+    #print(end-start)
