@@ -98,7 +98,7 @@ Below we can see testing of various k-values on a more realistic and colourful i
 #### K = 128:
 
 <p float="left">
-  <img src="display_imageslandscape_k128.png" width="300" />
+  <img src="display_images/landscape_results/landscape_k128.png" width="300" />
 </p>
 
 For the sake of not crowding with too many images, above are only some of the results at various iteration steps for a given k. I am displaying the images that show the most interesting changes/results, for the lower k-values, after the first few iterations there is very little change, and this generally becomes more true at all points of the process for higher k-values as we would expect. Interestingly we see here that even a value as low as k=8 does a relatively good job of capturing the primary colours of the image, and as k further increases the image becomes more closely recreated. This suggests that a value from anywhere between k=8 to k=16 is good enough for sorting even more detailed images, again this is subject to change dependent on the exact parameters of the image.
