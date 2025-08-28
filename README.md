@@ -45,8 +45,110 @@ We also need to think about the k-value to use for different types of images, th
 
 Below we can see testing of various k-values on a more realistic and colourful image. At low k-values the most interesting changes can be observed within the first few iterations, for example if one centroid ends up starting as a colour randomly (espcially if the colour isn't prominent in the image), the new iterations rapidly change colour to a closer representation of the average colour of the image.
 
+### Results:
+
+#### K = 2:
+
+<p float="left">
+  <img src="display_images/landscape_results/k=2/landscape_k2_1.png" width="300" />
+  <img src="display_images/landscape_results/k=2/landscape_k2_2.png" width="300" />
+  <img src="display_images/landscape_results/k=2/landscape_k2_3.png" width="300" />
+  <img src="display_images/landscape_results/k=2/landscape_k2_4.png" width="300" />
+  <img src="display_images/landscape_results/k=2/landscape_k2_10.png" width="300" />
+</p>
+
+#### K = 4:
+
+<p float="left">
+  <img src="display_images/landscape_results/k=4/landscape_k4_1.png" width="300" />
+  <img src="display_images/landscape_results/k=4/landscape_k4_2.png" width="300" />
+  <img src="display_images/landscape_results/k=4/landscape_k4_4.png" width="300" />
+  <img src="display_images/landscape_results/k=4/landscape_k4_10.png" width="300" />
+</p>
+
+#### K = 8:
+
+<p float="left">
+  <img src="display_images/landscape_results/k=8/landscape_k8_1.png" width="300" />
+  <img src="display_images/landscape_results/k=8/landscape_k8_2.png" width="300" />
+  <img src="display_images/landscape_results/k=8/landscape_k8_3.png" width="300" />
+  <img src="display_images/landscape_results/k=8/landscape_k8_10.png" width="300" />
+</p>
+
+#### K = 16:
+
+<p float="left">
+  <img src="display_images/landscape_results/k=16/landscape_k16_1.png" width="300" />
+  <img src="display_images/landscape_results/k=16/landscape_k16_2.png" width="300" />
+  <img src="display_images/landscape_results/k=16/landscape_k16_10.png" width="300" />
+</p>
+
+#### K = 32:
+
+<p float="left">
+  <img src="display_images/landscape_results/landscape_k32.png" width="300" />
+</p>
+
+#### K = 64:
+
+<p float="left">
+  <img src="display_images/landscape_results/landscape_k64.png" width="300" />
+</p>
+
+#### K = 128:
+
+<p float="left">
+  <img src="display_images/landscape_results/landscape_k128.png" width="300" />
+</p>
+
+For the sake of not crowding with too many images, above are only some of the results at various iteration steps for a given k. I am displaying the images that show the most interesting changes/results, for the lower k-values, after the first few iterations there is very little change, and this generally becomes more true at all points of the process for higher k-values as we would expect. Interestingly we see here that even a value as low as k=8 does a relatively good job of capturing the primary colours of the image, and as k further increases the image becomes more closely recreated. This suggests that a value from anywhere between k=8 to k=16 is good enough for sorting even more detailed images, again this is subject to change dependent on the exact parameters of the image.
 
 
+### Below are some gradient visualization images:
+
+![](display_images/landscape_results/landscape_k128_snw_gradient.png)
+
+![](display_images/zebras_k32_grad_torq.png)
+
+An interesting note is that this process does extremely well at recreating solid coloured objects, and the clusters are much more noticeable on gradient colours. This may sound obvious, but it is more interesting to see the how the results display this concept, for example in the images below, the zebras and the grass are almost perfectly recreated at k=32, however the sky of the image clearly has clustered colours. The bottom half of the image is nearly indistinguishable from the original at a glance, but the sky of the image is clearly split into distinct colour blocks.
+
+![](display_images/zebras_k32.png)
+
+Lastly we can see how this performs when it comes to sorting images by colour. I chose to use pixel-art images for this part due to simple colours and very quick k-means clustering of these low detail images. I used the following images to test both for warm-cool colour sorter, and colour spectrum based sorting. Note that the black backgrounds are ignored for the purposes of the algorithm and sorting. If not ignore these would severly ruin results, as up to half of some of these images would be considered black, which they are not.
+
+<p float="left">
+  <img src="display_images/pixel_art_images/cool.png" width="100" />
+  <img src="display_images/pixel_art_images/fox.png" width="100" />
+  <img src="display_images/pixel_art_images/frog.png" width="100" />
+  <img src="display_images/pixel_art_images/ghost.png" width="100" />
+  <img src="display_images/pixel_art_images/tree.png" width="100" />
+  <img src="display_images/pixel_art_images/ufo.png" width="100" />
+  <img src="display_images/pixel_art_images/warm.png" width="100" />
+  <img src="display_images/pixel_art_images/wizard.png" width="100" />
+</p>
 
 
+### Cool-Warm Sorting Results:
+
+#### Images considered 'cool':
+![](display_images/pixel_art_images/pixel_art_cool.png)
+
+#### Images considered 'warm':
+![](display_images/pixel_art_images/pixel_art_warm.png)
+
+
+### Colour Spectrum Sorting Results:
+
+#### Images were sorted into this order:
+![](display_images/pixel_art_images/pixel_art_colour_spectrum.png)
+
+#### Dominant colour of each image is considered to be:
+![](display_images/pixel_art_images/pixel_art_colour_spectrum_colours.png)
+
+
+### Future Improvements
+Whilst this project is currently complete and fully functional, potential future enhancements include:
+-Dynamic k-value selection
+-Support for handling larger images, such as 4k resolution
+-Intelligent image recolouring (this could be based on brightness relationships, or something else)
 
