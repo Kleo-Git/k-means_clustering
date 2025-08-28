@@ -246,10 +246,15 @@ if __name__ == "__main__":
     gradient = Colour_Map_Object()
     
     g = gradient.colour_gradient([gradient.main_colours["red"], gradient.main_colours["blue"]])
+
+    f = gradient.colour_gradient("torq")
     
-    #g = gradient.colour_gradient("torq")
+    f = gradient.colour_gradient("snw")
     
     gradient.plot_gradient(g)
+    
+    gradient.plot_gradient(f)
+    
     
         
         

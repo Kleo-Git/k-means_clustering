@@ -715,14 +715,14 @@ class KMeans_Image:
 
 if __name__ == "__main__":
     start = time.time()
-    k=16
-    image_rgb = Image_To_Array("images/lion_test.jpg", "RGB")
+    k=2
+    image_rgb = Image_To_Array("display_images/checkerboard.jpg", "RGB")
     #image_rgb.show_image()
     colour_object = Colour_Map_Object()
     colours=colour_object.gradient_colour_map(k, "snw")
-    kmeans_rgb = KMeans_Image(image_rgb, k, colours=colours, ignore_background=False)
-    kmeans_rgb.kmeans_loop(tolerance=1e-3,max_iterations=1000, display_interval=9)
-    kmeans_rgb.visualize_with_gradient_colors()
+    kmeans_rgb = KMeans_Image(image_rgb, k, colours=colours, ignore_background=False, messages = True)
+    kmeans_rgb.kmeans_loop(tolerance=1e-3,max_iterations=10, display_interval=1)
+    #kmeans_rgb.visualize_with_gradient_colors()
     #print(kmeans_rgb.wcss)
     #end=time.time()
     #print(end-start)
