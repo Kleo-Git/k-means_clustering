@@ -146,3 +146,9 @@ Lastly we can see how this performs when it comes to sorting images by colour. I
 ![](display_images/pixel_art_images/pixel_art_colour_spectrum_colours.png)
 
 
+### Future Improvements
+Whilst this project is currently complete and fully functional, potential future enhancements include:
+-Dynamic k-value selection
+-Support for handling larger images, such as 4k resolution
+-Intelligent image recolouring (this could be based on brightness relationships, or something else)
+
