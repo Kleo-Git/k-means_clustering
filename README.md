@@ -114,6 +114,57 @@ An interesting note is that this process does extremely well at recreating solid
 
 ![](display_images/zebras_k32.png)
 
+We can also run the process on different colour spaces and see how the chosen colour space will affect the end result. Overall, the colour space does have quite significant impact on the end result, the images for different colour spaces clearly look different by the end of the process. Below we can see each of the images created by different colour spaces, at the start and end of the iterative process. The difference between the initial images is very clear and far larger then the differences in the images at the end, which look quite similar although still noticeably different.
+
+### Colour-Space Results:
+
+#### Turtle Images:
+
+<p float="left">
+  <img src="display_images/colour_spaces/turtle/HSV/turtle_k32_HSV_1.png" width="500" />
+  <img src="display_images/colour_spaces/turtle/HSV/turtle_k32_HSV_2.png" width="500" />
+</p>
+<p float="left">
+  <img src="display_images/colour_spaces/turtle/LUV/turtle_k32_LUV_1.png" width="500" />
+  <img src="display_images/colour_spaces/turtle/LUV/turtle_k32_LUV_2.png" width="500" />
+</p>
+<p float="left">
+  <img src="display_images/colour_spaces/turtle/XYZ/turtle_k32_XYZ_1.png" width="500" />
+  <img src="display_images/colour_spaces/turtle/XYZ/turtle_k32_XYZ_2.png" width="500" />
+</p>
+<p float="left">
+  <img src="display_images/colour_spaces/turtle/LAB/turtle_k32_LAB_1.png" width="500" />
+  <img src="display_images/colour_spaces/turtle/LAB/turtle_k32_LAB_2.png" width="500" />
+</p>
+<p float="left">
+  <img src="display_images/colour_spaces/turtle/RGB/turtle_k32_RGB_1.png" width="500" />
+  <img src="display_images/colour_spaces/turtle/RGB/turtle_k32_RGB_2.png" width="500" />
+</p>
+
+#### Neubla Images:
+
+<p float="left">
+  <img src="display_images/colour_spaces/nebula/HSV/nebula_k32_HSV_1.png" width="500" />
+  <img src="display_images/colour_spaces/nebula/HSV/nebula_k32_HSV_2.png" width="500" />
+</p>
+<p float="left">
+  <img src="display_images/colour_spaces/nebula/LUV/nebula_k32_LUV_1.png" width="500" />
+  <img src="display_images/colour_spaces/nebula/LUV/nebula_k32_LUV_2.png" width="500" />
+</p>
+<p float="left">
+  <img src="display_images/colour_spaces/nebula/XYZ/nebula_k32_XYZ_1.png" width="500" />
+  <img src="display_images/colour_spaces/nebula/XYZ/nebula_k32_XYZ_2.png" width="500" />
+</p>
+<p float="left">
+  <img src="display_images/colour_spaces/nebula/LAB/nebula_k32_LAB_1.png" width="500" />
+  <img src="display_images/colour_spaces/nebula/LAB/nebula_k32_LAB_2.png" width="500" />
+</p>
+<p float="left">
+  <img src="display_images/colour_spaces/nebula/RGB/nebula_k32_RGB_1.png" width="500" />
+  <img src="display_images/colour_spaces/nebula/RGB/nebula_k32_RGB_2.png" width="500" />
+</p>
+
+
 Lastly we can see how this performs when it comes to sorting images by colour. I chose to use pixel-art images for this part due to simple colours and very quick k-means clustering of these low detail images. I used the following images to test both for warm-cool colour sorter, and colour spectrum based sorting. Note that the black backgrounds are ignored for the purposes of the algorithm and sorting. If not ignore these would severly ruin results, as up to half of some of these images would be considered black, which they are not.
 
 <p float="left">
